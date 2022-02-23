@@ -85,7 +85,7 @@ public:
         lineobs = line.head<4>();
         lineobs_R = line.tail<4>();
     }
-    Vector4d lineobs;   // 每一帧上的观测
+    Vector4d lineobs;   // 每一帧上的观测, 起点终点的相机坐标系 归一化坐标
     Vector4d lineobs_R;
     double z;
     bool is_used;
@@ -107,14 +107,14 @@ public:
     int used_num;
     bool is_outlier;
     bool is_margin;
-    bool is_triangulation;
-    Vector6d line_plucker;
+    bool is_triangulation; //成功三角化普吕克坐标
+    Vector6d line_plucker; //参考相机帧下， plk in camera frame (n , v)
 
     Vector4d obs_init;
     Vector4d obs_j;
     Vector6d line_plk_init; // used to debug
-    Vector3d ptw1;  // used to debug
-    Vector3d ptw2;  // used to debug
+    Vector3d ptw1;  // used to debug //世界系下直线起点
+    Vector3d ptw2;  // used to debug //世界系下直线终点
     Eigen::Vector3d tj_;   // tij
     Eigen::Matrix3d Rj_;
     Eigen::Vector3d ti_;   // tij
@@ -177,8 +177,8 @@ class FeatureManager
     void removeBack();
     void removeFront(int frame_count);
     void removeOutlier();
-    list<FeaturePerId> feature;
-    list<lineFeaturePerId> linefeature;
+    list<FeaturePerId> feature; //滑窗内所有的点特征
+    list<lineFeaturePerId> linefeature; //滑窗内所有的线特征
     int last_track_num;
 
   private:

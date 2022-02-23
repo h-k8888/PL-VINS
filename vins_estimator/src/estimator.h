@@ -72,7 +72,7 @@ class Estimator
     void LineBAincamera();
     void vector2double();
     void double2vector();
-    void double2vector2();
+    void double2vector2();//todo
     bool failureDetection();
 
     void setReloFrame(double _frame_stamp, int _frame_index, vector<Vector3d> &_match_points, Vector3d _relo_t, Matrix3d _relo_r);
@@ -104,7 +104,7 @@ class Estimator
     Matrix3d ric[NUM_OF_CAM];
     Vector3d tic[NUM_OF_CAM];
 
-    Vector3d Ps[(WINDOW_SIZE + 1)];
+    Vector3d Ps[(WINDOW_SIZE + 1)];//滑窗内的状态量
     Vector3d Vs[(WINDOW_SIZE + 1)];
     Matrix3d Rs[(WINDOW_SIZE + 1)];
     Vector3d Bas[(WINDOW_SIZE + 1)];
@@ -141,7 +141,7 @@ class Estimator
     double para_Pose[WINDOW_SIZE + 1][SIZE_POSE];
     double para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];
     double para_Feature[NUM_OF_F][SIZE_FEATURE];
-    double para_LineFeature[NUM_OF_F][SIZE_LINE];
+    double para_LineFeature[NUM_OF_F][SIZE_LINE]; //线特征参数
     double para_Ex_Pose[NUM_OF_CAM][SIZE_POSE];
     double para_Retrive_Pose[SIZE_POSE];
 

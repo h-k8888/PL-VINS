@@ -52,7 +52,7 @@ Eigen::Vector3d tmp_Bg;
 Eigen::Vector3d acc_0;
 Eigen::Vector3d gyr_0;
 
-queue<pair<cv::Mat, double>> image_buf;
+queue<pair<cv::Mat, double>> image_buf;// 图像、时间戳
 LoopClosure *loop_closure;
 KeyFrameDatabase keyframe_database;
 
@@ -123,7 +123,7 @@ std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>,
 getMeasurements()
 {
     std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>,
-            std::pair<sensor_msgs::PointCloudConstPtr,sensor_msgs::PointCloudConstPtr> >> measurements;
+            std::pair<sensor_msgs::PointCloudConstPtr,sensor_msgs::PointCloudConstPtr> >> measurements;//IMU，点特征，线特征
 
     while (true)
     {
@@ -147,14 +147,14 @@ getMeasurements()
             linefeature_buf.pop();
             continue;
         }
-        sensor_msgs::PointCloudConstPtr img_msg = feature_buf.front();
+        sensor_msgs::PointCloudConstPtr img_msg = feature_buf.front();//点特征
         feature_buf.pop();
-        sensor_msgs::PointCloudConstPtr linefeature_msg = linefeature_buf.front();
+        sensor_msgs::PointCloudConstPtr linefeature_msg = linefeature_buf.front();//线特征
         linefeature_buf.pop();
 
         // 遍历两个图像之间所有的imu数据
         std::vector<sensor_msgs::ImuConstPtr> IMUs;
-        while (imu_buf.front()->header.stamp <= img_msg->header.stamp)
+        while (imu_buf.front()->header.stamp <= img_msg->header.stamp)//未估计dt
         {
             IMUs.emplace_back(imu_buf.front());
             imu_buf.pop();
@@ -248,7 +248,7 @@ void process()
     {
         //std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
         std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>,
-                std::pair<sensor_msgs::PointCloudConstPtr,sensor_msgs::PointCloudConstPtr> >> measurements;
+                std::pair<sensor_msgs::PointCloudConstPtr,sensor_msgs::PointCloudConstPtr> >> measurements;//IMU，点特征，线特征
         std::unique_lock<std::mutex> lk(m_buf);
         con.wait(lk, [&]
                  {
@@ -259,7 +259,7 @@ void process()
         for (auto &measurement : measurements)
         {
             for (auto &imu_msg : measurement.first)
-                send_imu(imu_msg);                     // 处理imu数据, 预测 pose
+                send_imu(imu_msg);                     // 处理imu数据, 预测 pose， 维护状态量和雅可比
 
             // set relocalization frame
             sensor_msgs::PointCloudConstPtr relo_msg = NULL;
@@ -297,7 +297,7 @@ void process()
             TicToc t_s;
             map<int, vector<pair<int, Vector3d>>> image;
             map<int, vector<pair<int, Vector4d>>> image1;
-            map<int, vector<pair<int, Matrix<double, 5, 1>>>> image2;
+            map<int, vector<pair<int, Matrix<double, 5, 1>>>> image2;//todo
             for (unsigned int i = 0; i < img_msg->points.size(); i++)
             {
                 int v = img_msg->channels[0].values[i] + 0.5;

@@ -564,15 +564,15 @@ double FeatureManager::reprojection_error( Vector4d obs, Matrix3d Rwc, Vector3d 
     d_w = line_w.tail(3);
 
     Vector3d p1, p2;
-    p1 << obs[0], obs[1], 1;
+    p1 << obs[0], obs[1], 1;//起点终点的相机坐标系 归一化坐标
     p2 << obs[2], obs[3], 1;
 
-    Vector6d line_c = plk_from_pose(line_w,Rwc,twc);
+    Vector6d line_c = plk_from_pose(line_w,Rwc,twc);//将w系下的普吕克坐标转换到相机系下
     Vector3d nc = line_c.head(3);
     double sql = nc.head(2).norm();
-    nc /= sql;
+    nc /= sql;//相机系下，法向量归一化
 
-    error += fabs( nc.dot(p1) );
+    error += fabs( nc.dot(p1) );//todo 投影到相机系下普吕克坐标法相量确定的平面计算距离？
     error += fabs( nc.dot(p2) );
 
     return error / 2.0;
@@ -590,6 +590,7 @@ void FeatureManager::triangulateLine(Vector3d Ps[], Vector3d tic[], Matrix3d ric
         if (it_per_id.is_triangulation)       // 如果已经三角化了
             continue;
 
+        //imu_i为参考帧，线特征起始帧
         int imu_i = it_per_id.start_frame, imu_j = imu_i - 1;
 
         ROS_ASSERT(NUM_OF_CAM == 1);
@@ -604,7 +605,7 @@ void FeatureManager::triangulateLine(Vector3d Ps[], Vector3d tic[], Matrix3d ric
 
         // plane pi from ith obs in ith camera frame
         Eigen::Vector4d pii;
-        Eigen::Vector3d ni;      // normal vector of plane    
+        Eigen::Vector3d ni;      // normal vector of plane    i帧
         for (auto &it_per_frame : it_per_id.linefeature_per_frame)   // 遍历所有的观测， 注意 start_frame 也会被遍历
         {
             imu_j++;
@@ -620,8 +621,8 @@ void FeatureManager::triangulateLine(Vector3d Ps[], Vector3d tic[], Matrix3d ric
             }
 
             // 非start frame(其他帧)上的观测
-            Eigen::Vector3d t1 = Ps[imu_j] + Rs[imu_j] * tic[0];
-            Eigen::Matrix3d R1 = Rs[imu_j] * ric[0];
+            Eigen::Vector3d t1 = Ps[imu_j] + Rs[imu_j] * tic[0];// t_w_cj = Rwi * tic + twi
+            Eigen::Matrix3d R1 = Rs[imu_j] * ric[0];// Rw_cj = Rwi * Ric
 
             Eigen::Vector3d t = R0.transpose() * (t1 - t0);   // tij
             Eigen::Matrix3d R = R0.transpose() * R1;          // Rij
@@ -629,20 +630,21 @@ void FeatureManager::triangulateLine(Vector3d Ps[], Vector3d tic[], Matrix3d ric
             Eigen::Vector4d obsj_tmp = it_per_frame.lineobs;
 
             // plane pi from jth obs in ith camera frame
-            Vector3d p3( obsj_tmp(0), obsj_tmp(1), 1 );
+            Vector3d p3( obsj_tmp(0), obsj_tmp(1), 1 );//j帧下 起点
             Vector3d p4( obsj_tmp(2), obsj_tmp(3), 1 );
-            p3 = R * p3 + t;
+            p3 = R * p3 + t;//坐标变换到i帧 i <-- j
             p4 = R * p4 + t;
             Vector4d pij = pi_from_ppp(p3, p4,t);
-            Eigen::Vector3d nj = pij.head(3); nj.normalize(); 
+            Eigen::Vector3d nj = pij.head(3); nj.normalize(); // i帧相机系下， j帧线特征的法向量
 
             double cos_theta = ni.dot(nj);
-            if(cos_theta < min_cos_theta)
+            //选法向量夹角最大的两帧
+            if(cos_theta < min_cos_theta)//两法向量夹角足够大
             {
                 min_cos_theta = cos_theta;
                 tij = t;
                 Rij = R;
-                obsj = obsj_tmp;
+                obsj = obsj_tmp;//记录j帧的相机系下，起点终点归一化坐标
                 d = t.norm();
             }
             // if( d < t.norm() )  // 选择最远的那俩帧进行三角化
@@ -668,7 +670,8 @@ void FeatureManager::triangulateLine(Vector3d Ps[], Vector3d tic[], Matrix3d ric
         p4 = Rij * p4 + tij;
         Vector4d pij = pi_from_ppp(p3, p4,tij);
 
-        Vector6d plk = pipi_plk( pii, pij );
+        //i帧相机系下的普吕克坐标
+        Vector6d plk = pipi_plk( pii, pij );//todo check pii pij
         Vector3d n = plk.head(3);
         Vector3d v = plk.tail(3);
 
@@ -720,8 +723,8 @@ void FeatureManager::triangulateLine(Vector3d Ps[], Vector3d tic[], Matrix3d ric
 
         Vector3d w_pts_1 =  Rs[imu_i] * (ric[0] * pts_1 + tic[0]) + Ps[imu_i];
         Vector3d w_pts_2 =  Rs[imu_i] * (ric[0] * pts_2 + tic[0]) + Ps[imu_i];
-        it_per_id.ptw1 = w_pts_1;
-        it_per_id.ptw2 = w_pts_2;
+        it_per_id.ptw1 = w_pts_1; //世界系下直线起点
+        it_per_id.ptw2 = w_pts_2; //世界系下直线终点
 
         //if(isnan(cp(0)))
         {
@@ -1218,6 +1221,7 @@ void FeatureManager::removeLineOutlier()
     }
 }
 
+// 滑窗内body的pose，相机到IMU的外参
 void FeatureManager::removeLineOutlier(Vector3d Ps[], Vector3d tic[], Matrix3d ric[])
 {
 
@@ -1225,7 +1229,7 @@ void FeatureManager::removeLineOutlier(Vector3d Ps[], Vector3d tic[], Matrix3d r
          it_per_id != linefeature.end(); it_per_id = it_next)
     {
         it_next++;
-        it_per_id->used_num = it_per_id->linefeature_per_frame.size();
+        it_per_id->used_num = it_per_id->linefeature_per_frame.size();//观测到的次数
         if (!(it_per_id->used_num >= LINE_MIN_OBS && it_per_id->start_frame < WINDOW_SIZE - 2 && it_per_id->is_triangulation))
             continue;
 
@@ -1250,33 +1254,33 @@ void FeatureManager::removeLineOutlier(Vector3d Ps[], Vector3d tic[], Matrix3d r
         }
 
         Matrix4d Lc;
-        Lc << skew_symmetric(nc), vc, -vc.transpose(), 0;
+        Lc << skew_symmetric(nc), vc, -vc.transpose(), 0; //相机系下普吕克矩阵
 
         Vector4d obs_startframe = it_per_id->linefeature_per_frame[0].lineobs;   // 第一次观测到这帧
-        Vector3d p11 = Vector3d(obs_startframe(0), obs_startframe(1), 1.0);
-        Vector3d p21 = Vector3d(obs_startframe(2), obs_startframe(3), 1.0);
+        Vector3d p11 = Vector3d(obs_startframe(0), obs_startframe(1), 1.0); //起点相机系归一化坐标
+        Vector3d p21 = Vector3d(obs_startframe(2), obs_startframe(3), 1.0); //终点相机系归一化坐标
         Vector2d ln = ( p11.cross(p21) ).head(2);     // 直线的垂直方向
-        ln = ln / ln.norm();
+        ln = ln / ln.norm(); //归一相机系下归一化直线垂直方向
 
         Vector3d p12 = Vector3d(p11(0) + ln(0), p11(1) + ln(1), 1.0);  // 直线垂直方向上移动一个单位
         Vector3d p22 = Vector3d(p21(0) + ln(0), p21(1) + ln(1), 1.0);
         Vector3d cam = Vector3d( 0, 0, 0 );
 
-        Vector4d pi1 = pi_from_ppp(cam, p11, p12);
-        Vector4d pi2 = pi_from_ppp(cam, p21, p22);
+        Vector4d pi1 = pi_from_ppp(cam, p11, p12); //相机系下的 （相机原点， 起点， 起点垂直平移）
+        Vector4d pi2 = pi_from_ppp(cam, p21, p22); //相机系下的 （相机原点， 终点， 终点垂直平移）
 
         Vector4d e1 = Lc * pi1;
         Vector4d e2 = Lc * pi2;
-        e1 = e1/e1(3);
-        e2 = e2/e2(3);
+        e1 = e1/e1(3); //起点3d坐标
+        e2 = e2/e2(3); //终点3d坐标
 
         //std::cout << "line endpoint: "<<e1 << "\n "<< e2<<"\n";
-        if(e1(2) < 0 || e2(2) < 0)
+        if(e1(2) < 0 || e2(2) < 0) //深度为负舍去
         {
             linefeature.erase(it_per_id);
             continue;
         }
-        if((e1-e2).norm() > 10)
+        if((e1-e2).norm() > 10) //直线太长舍去？
         {
             linefeature.erase(it_per_id);
             continue;
@@ -1292,6 +1296,7 @@ void FeatureManager::removeLineOutlier(Vector3d Ps[], Vector3d tic[], Matrix3d r
         }
 */
         // 并且平均投影误差不能太大啊
+        //w系下普吕克坐标
         Vector6d line_w = plk_to_pose(it_per_id->line_plucker, Rwc, twc);  // transfrom to world frame
 
         int i = 0;
@@ -1305,9 +1310,9 @@ void FeatureManager::removeLineOutlier(Vector3d Ps[], Vector3d tic[], Matrix3d r
         {
             imu_j++;
 
-            obs = it_per_frame.lineobs;
-            Eigen::Vector3d t1 = Ps[imu_j] + Rs[imu_j] * tic[0];
-            Eigen::Matrix3d R1 = Rs[imu_j] * ric[0];
+            obs = it_per_frame.lineobs; // 每一帧上的观测, 起点终点的相机坐标系 归一化坐标
+            Eigen::Vector3d t1 = Ps[imu_j] + Rs[imu_j] * tic[0]; // t_w_cj = Rwi * tic + twi
+            Eigen::Matrix3d R1 = Rs[imu_j] * ric[0];// R_w_cj
 
             double err =  reprojection_error(obs, R1, t1, line_w);
 

@@ -117,11 +117,13 @@ void Estimator::processIMU(double dt, const Vector3d &linear_acceleration, const
 }
 
 //Eigen::Matrix<double, 5, 1>
+//todo
 void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 5, 1>>>> &image, const map<int, vector<pair<int, Vector4d>>> &lines, const std_msgs::Header &header)
 {
     ROS_DEBUG("new image coming ------------------------------------------");
     ROS_DEBUG("Adding feature points %lu", image.size());
-    // if (f_manager.addFeatureCheckParallax(frame_count, image))           // 当视差较大时，marg 老的关键帧
+    //if (f_manager.addFeatureCheckParallax(frame_count, image))           // 当视差较大时，marg 老的关键帧
+    ///函数内部近加入了新的线特征，判断视差仅使用了点特征，未使用线特征
     if(f_manager.addFeatureCheckParallax(frame_count, image, lines))       // 对检测到的特征进行存放处理
         marginalization_flag = MARGIN_OLD;
     else                                                                   // 当视差较小时，比如静止，marg 新的图像帧
@@ -137,6 +139,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
     imageframe.pre_integration = tmp_pre_integration;            // tmp_pre_integration 记录了上次图像到这次图像之间的积分量
     all_image_frame.insert(make_pair(header.stamp.toSec(), imageframe));
     tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};  // 在新的图像上，重新开始一个预积分量
+
     if(ESTIMATE_EXTRINSIC == 2)
     {
         ROS_INFO("calibrating extrinsic param, rotation movement is needed");
@@ -788,14 +791,17 @@ void Estimator::solveOdometry()
         if(baseline_ > 0) //stereo
             f_manager.triangulateLine(baseline_);
         else
-            f_manager.triangulateLine(Ps, tic, ric);
+            //每次优化前，选择夹角最大的两帧对线特征普吕克坐标初始化
+            f_manager.triangulateLine(Ps, tic, ric);//三角化线特征
 
         ROS_DEBUG("triangulation costs %f", t_tri.toc());
 
         // optimization();
 
+        //仅优化线特征状态量，固定其他状态量
         onlyLineOpt();   // 三角化以后，优化一把
-        optimizationwithLine();
+
+        optimizationwithLine();//加入线特征的滑窗
 
 #ifdef LINEINCAM
         LineBAincamera();
@@ -923,7 +929,7 @@ void Estimator::double2vector()
 
 
     //std::cout <<"----------\n"<< Rwow1 <<"\n"<<twow1<<std::endl;
-    MatrixXd lineorth_vec(f_manager.getLineFeatureCount(),4);
+    MatrixXd lineorth_vec(f_manager.getLineFeatureCount(),4);//优化后的线特征4维状态量
     for (int i = 0; i < f_manager.getLineFeatureCount(); ++i) {
         Vector4d orth(para_LineFeature[i][0],
                       para_LineFeature[i][1],
@@ -1148,9 +1154,11 @@ void  Estimator::onlyLineOpt()
                 << para_LineFeature[feature_index][2] <<" "
                 << para_LineFeature[feature_index][3] <<"\n";
         */
+        ///对筛选过的线特征，添加线状态量参数块
         ceres::LocalParameterization *local_parameterization_line = new LineOrthParameterization();
         problem.AddParameterBlock( para_LineFeature[feature_index], SIZE_LINE, local_parameterization_line);  // p,q
 
+        ///对线特征添加重投影残差
         int imu_i = it_per_id.start_frame,imu_j = imu_i - 1;
         for (auto &it_per_frame : it_per_id.linefeature_per_frame)
         {
@@ -1169,7 +1177,7 @@ void  Estimator::onlyLineOpt()
         }
     }
 
-    if(feature_index < 3)
+    if(feature_index < 3)//符合要求的线特征数量太少，直接退出
     {
         return;
     }
@@ -1807,7 +1815,7 @@ void Estimator::optimizationwithLine()
         }
 
         {
-            // Line feature
+            // Line feature 边缘化最老帧的线特征
             int linefeature_index = -1;
             for (auto &it_per_id : f_manager.linefeature)
             {
