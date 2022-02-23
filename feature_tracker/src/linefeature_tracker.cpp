@@ -13,14 +13,15 @@ void LineFeatureTracker::readIntrinsicParameter(const string &calib_file)
     ROS_INFO("reading paramerter of camera %s", calib_file.c_str());
 
     m_camera = CameraFactory::instance()->generateCameraFromYamlFile(calib_file);
-    K_ = m_camera->initUndistortRectifyMap(undist_map1_,undist_map2_);    
+    K_ = m_camera->initUndistortRectifyMap(undist_map1_,undist_map2_);//获取畸变坐标映射矩阵mapx和mapy
 
 }
 
+//根据内参，从像素坐标反算相机系下归一化平面的坐标
 vector<Line> LineFeatureTracker::undistortedLineEndPoints()
 {
     vector<Line> un_lines;
-    un_lines = curframe_->vecLine;
+    un_lines = curframe_->vecLine;//当前帧储存的直线
     float fx = K_.at<float>(0, 0);
     float fy = K_.at<float>(1, 1);
     float cx = K_.at<float>(0, 2);
@@ -410,10 +411,11 @@ vector< int >  last_unsuccess_id;
 Mat last_unsuccess_lbd_descr;
 void LineFeatureTracker::readImage(const cv::Mat &_img)
 {
-    cv::Mat img;
+    cv::Mat img;//畸变纠正后影像
     TicToc t_p;
     frame_cnt++;
 
+    //畸变纠正
     cv::remap(_img, img, undist_map1_, undist_map2_, CV_INTER_LINEAR);
 
 
@@ -439,7 +441,7 @@ void LineFeatureTracker::readImage(const cv::Mat &_img)
     else
     {
         forwframe_.reset(new FrameLines);  // 初始化一个新的帧
-        forwframe_->img = img;
+        forwframe_->img = img;//记录去畸变、均衡化后的image
     }
     TicToc t_li;
     Ptr<line_descriptor::LSDDetectorC> lsd_ = line_descriptor::LSDDetectorC::createLSDDetectorC();
@@ -479,7 +481,7 @@ void LineFeatureTracker::readImage(const cv::Mat &_img)
     sum_time += t_li.toc();
    ROS_INFO("line detect costs: %fms", t_li.toc());
 
-    Mat lbd_descr, keylbd_descr;
+    Mat lbd_descr, keylbd_descr;//矩阵内每一行记录一条直线的lbd描述
     // step 2: lbd descriptor
     TicToc t_lbd;
     Ptr<BinaryDescriptor> bd_ = BinaryDescriptor::createBinaryDescriptor(  );
@@ -490,7 +492,7 @@ void LineFeatureTracker::readImage(const cv::Mat &_img)
 //////////////////////////
     for ( int i = 0; i < (int) lsd.size(); i++ )
     {
-        if( lsd[i].octave == 0 && lsd[i].lineLength >= 60)
+        if( lsd[i].octave == 0 && lsd[i].lineLength >= 60)/** octave (pyramid layer), from which the keyline has been extracted */
         {
             keylsd.push_back( lsd[i] );
             keylbd_descr.push_back( lbd_descr.row( i ) );
@@ -506,7 +508,7 @@ void LineFeatureTracker::readImage(const cv::Mat &_img)
 
     for (size_t i = 0; i < forwframe_->keylsd.size(); ++i) {
         if(first_img)
-            forwframe_->lineID.push_back(allfeature_cnt++);
+            forwframe_->lineID.push_back(allfeature_cnt++);//第一帧直接累计所有直线索引
         else
             forwframe_->lineID.push_back(-1);   // give a negative id
     }
@@ -538,6 +540,7 @@ void LineFeatureTracker::readImage(const cv::Mat &_img)
         std::vector<DMatch> good_matches;
         std::vector<KeyLine> good_Keylines;
         good_matches.clear();
+        ///根据起点终点距离再次筛选匹配直线，存在遮挡时可能有问题
         for ( int i = 0; i < (int) lsd_matches.size(); i++ )
         {
             if( lsd_matches[i].distance < 30 ){
@@ -571,10 +574,11 @@ void LineFeatureTracker::readImage(const cv::Mat &_img)
         vector<KeyLine> vecLine_tracked, vecLine_new;
         vector< int > lineID_tracked, lineID_new;
         Mat DEscr_tracked, Descr_new;
+
         // 将跟踪的线和没跟踪上的线进行区分
         for (size_t i = 0; i < forwframe_->keylsd.size(); ++i)
         {
-            if( forwframe_->lineID[i] == -1)
+            if( forwframe_->lineID[i] == -1)//未跟踪到的直线
             {
                 forwframe_->lineID[i] = allfeature_cnt++;
                 vecLine_new.push_back(forwframe_->keylsd[i]);
@@ -670,7 +674,7 @@ void LineFeatureTracker::readImage(const cv::Mat &_img)
 
     }
 
-    // 将opencv的KeyLine数据转为季哥的Line
+    // 将opencv的KeyLine数据转为Line，重新记录了起点，终点，长度
     for (int j = 0; j < forwframe_->keylsd.size(); ++j) {
         Line l;
         KeyLine lsd = forwframe_->keylsd[j];

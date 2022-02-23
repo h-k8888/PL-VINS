@@ -18,7 +18,7 @@ queue<sensor_msgs::ImageConstPtr> img_buf;
 
 ros::Publisher pub_img,pub_match;
 
-LineFeatureTracker trackerData;
+LineFeatureTracker trackerData;//线特征跟踪器
 double first_image_time;
 int pub_count = 1;
 bool first_image_flag = true;
@@ -57,9 +57,11 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
 //    cv::waitKey(1);
     
     frame_cnt++;
+    //读图，lsd，lbd，线跟踪
     trackerData.readImage(ptr->image.rowRange(0 , ROW));   // rowRange(i,j) 取图像的i～j行
 
         pub_count++;
+        //点云记录直线起点（相机系归一化平面）, 并用
         sensor_msgs::PointCloudPtr feature_lines(new sensor_msgs::PointCloud);
         sensor_msgs::ChannelFloat32 id_of_line;   //  feature id
         sensor_msgs::ChannelFloat32 u_of_endpoint;    //  u
@@ -73,15 +75,16 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         {
             if (i != 1 || !STEREO_TRACK)  // 单目
             {
+                //根据内参，从像素坐标反算相机系下归一化平面的坐标
                 auto un_lines = trackerData.undistortedLineEndPoints();
 
                 //auto &cur_lines = trackerData.curframe_->vecLine;
-                auto &ids = trackerData.curframe_->lineID;
+                auto &ids = trackerData.curframe_->lineID; //线当前帧id --> 全局id
 
                 for (unsigned int j = 0; j < ids.size(); j++)
                 {
 
-                    int p_id = ids[j];
+                    int p_id = ids[j];//线全局索引
                     hash_ids[i].insert(p_id);
                     geometry_msgs::Point32 p;
                     p.x = un_lines[j].StartPt.x;
@@ -98,6 +101,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
             }
 
         }
+        //id 终点uv，以channels形式记录到起点的点云数据中
         feature_lines->channels.push_back(id_of_line);
         feature_lines->channels.push_back(u_of_endpoint);
         feature_lines->channels.push_back(v_of_endpoint);

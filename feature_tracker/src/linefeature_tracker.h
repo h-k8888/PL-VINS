@@ -12,6 +12,7 @@
 #include "parameters.h"
 #include "tic_toc.h"
 
+//不使用opencv的lsd
 // #include <opencv2/line_descriptor.hpp>
 #include <opencv2/features2d.hpp>
 
@@ -58,7 +59,7 @@ public:
     Mat img;
     
     vector<Line> vecLine;
-    vector< int > lineID;
+    vector< int > lineID; //当前帧索引 --> 全局索引
 
     // opencv3 lsd+lbd
     std::vector<KeyLine> keylsd;
@@ -78,8 +79,10 @@ class LineFeatureTracker
 
     void readImage(const cv::Mat &_img);
 
+    //当前帧， 新的一帧
     FrameLinesPtr curframe_, forwframe_;
 
+    //畸变坐标映射矩阵map1和map2, 内参
     cv::Mat undist_map1_, undist_map2_ , K_;
 
     camodocal::CameraPtr m_camera;       // pinhole camera
