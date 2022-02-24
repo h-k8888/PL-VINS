@@ -82,7 +82,7 @@ Vector4d plk_to_orth(Vector6d plk)
 
 }
 
-
+//正交表示转普吕克坐标
 Vector6d orth_to_plk(Vector4d orth)
 {
     Vector6d plk;

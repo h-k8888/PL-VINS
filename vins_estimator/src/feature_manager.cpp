@@ -496,6 +496,8 @@ void FeatureManager::setLineOrthInCamera(MatrixXd x)
          */
     }
 }
+
+//获取直线正交表示
 MatrixXd FeatureManager::getLineOrthVector(Vector3d Ps[], Vector3d tic[], Matrix3d ric[])
 {
     MatrixXd lineorth_vec(getLineFeatureCount(),4);
@@ -522,6 +524,7 @@ MatrixXd FeatureManager::getLineOrthVector(Vector3d Ps[], Vector3d tic[], Matrix
     return lineorth_vec;
 }
 
+//正交表示转换成普吕克坐标并记录
 void FeatureManager::setLineOrth(MatrixXd x,Vector3d P[], Matrix3d R[], Vector3d tic[], Matrix3d ric[])
 {
     int feature_index = -1;

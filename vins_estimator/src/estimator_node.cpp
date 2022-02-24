@@ -147,6 +147,8 @@ getMeasurements()
             linefeature_buf.pop();
             continue;
         }
+
+        //todo 检查点特征和线特征的时间戳是否相同
         sensor_msgs::PointCloudConstPtr img_msg = feature_buf.front();//点特征
         feature_buf.pop();
         sensor_msgs::PointCloudConstPtr linefeature_msg = linefeature_buf.front();//线特征
@@ -296,8 +298,8 @@ void process()
 
             TicToc t_s;
             map<int, vector<pair<int, Vector3d>>> image;
-            map<int, vector<pair<int, Vector4d>>> image1;
-            map<int, vector<pair<int, Matrix<double, 5, 1>>>> image2;//todo
+            map<int, vector<pair<int, Vector4d>>> image1;//特征点索引 feature_id --> (camera_id, [x, y, z, 0])
+            map<int, vector<pair<int, Matrix<double, 5, 1>>>> image2;//特征点索引 feature_id --> (camera_id, [x, y, z, u, v])
             for (unsigned int i = 0; i < img_msg->points.size(); i++)
             {
                 int v = img_msg->channels[0].values[i] + 0.5;
@@ -332,7 +334,7 @@ void process()
             //     ROS_ASSERT(z == 1);
             //     image[feature_id].emplace_back(camera_id, xyz_uv);
             // }
-            map<int, vector<pair<int, Vector4d>>> lines;
+            map<int, vector<pair<int, Vector4d>>> lines; // 特征线索引feature_id --> (相机id,  起始点xy、终点xy)
             for (unsigned int i = 0; i < line_msg->points.size(); i++)
             {
                 int v = line_msg->channels[0].values[i] + 0.5;

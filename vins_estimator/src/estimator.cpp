@@ -116,15 +116,14 @@ void Estimator::processIMU(double dt, const Vector3d &linear_acceleration, const
     gyr_0 = angular_velocity;
 }
 
-//Eigen::Matrix<double, 5, 1>
-//todo
+//Eigen::Matrix<double, 5, 1> xyz_uv
 void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 5, 1>>>> &image, const map<int, vector<pair<int, Vector4d>>> &lines, const std_msgs::Header &header)
 {
     ROS_DEBUG("new image coming ------------------------------------------");
     ROS_DEBUG("Adding feature points %lu", image.size());
-    //if (f_manager.addFeatureCheckParallax(frame_count, image))           // 当视差较大时，marg 老的关键帧
+
     ///函数内部近加入了新的线特征，判断视差仅使用了点特征，未使用线特征
-    if(f_manager.addFeatureCheckParallax(frame_count, image, lines))       // 对检测到的特征进行存放处理
+    if(f_manager.addFeatureCheckParallax(frame_count, image, lines))       // 对检测到的特征进行存放处理, 当视差较大时，marg 老的关键帧
         marginalization_flag = MARGIN_OLD;
     else                                                                   // 当视差较小时，比如静止，marg 新的图像帧
         marginalization_flag = MARGIN_SECOND_NEW;
@@ -974,7 +973,7 @@ void Estimator::double2vector()
 
 }
 
-
+//增加了线特征优化后相对第一帧，position 和 yaw的纠正
 void Estimator::double2vector2()
 {
     // 六自由度优化的时候，整个窗口会在空间中任意优化，这时候我们需要把第一帧在yaw,position上的增量给去掉，因为vins在这几个方向上不可观，他们优化的增量也不可信。
@@ -1695,6 +1694,7 @@ void Estimator::optimizationwithLine()
 
     //double2vector();
 
+    //增加了线特征优化后相对第一帧，position 和 yaw的纠正
     double2vector2();   // Line pose change
     TicToc t_culling;
     f_manager.removeLineOutlier(Ps,tic,ric);   // remove Line outlier
