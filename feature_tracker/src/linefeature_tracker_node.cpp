@@ -101,7 +101,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
             }
 
         }
-        //id 终点uv，以channels形式记录到起点的点云数据中
+        //points记录起点（相机归一化坐标系），id、终点(相机系归一化坐标)，以channels形式记录到起点的点云数据中
         feature_lines->channels.push_back(id_of_line);
         feature_lines->channels.push_back(u_of_endpoint);
         feature_lines->channels.push_back(v_of_endpoint);
