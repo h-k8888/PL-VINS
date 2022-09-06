@@ -160,21 +160,21 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header, Eig
         relo_path.poses.push_back(pose_stamped);
         pub_relo_path.publish(relo_path);
 
-        ofstream foutC("/home/healer/catkin_PLVINS/src/PL-VINS/Trajactory/tum_fast_no_loop.txt", ios::app);
-        foutC.setf(ios::fixed, ios::floatfield);
-        foutC.precision(0);
-        foutC << header.stamp.toSec() * 1e9<< " ";
-        foutC.precision(5);
-        foutC << correct_t.x() << " "
-              << correct_t.y() << " "
-              << correct_t.z() << " "
-              << correct_q.w() << " "
-              << correct_q.x() << " "
-              << correct_q.y() << " "
-              << correct_q.z() <<endl;
-        foutC.close();
+//        ofstream foutC(VINS_RESULT_PATH, ios::app);
+//        foutC.setf(ios::fixed, ios::floatfield);
+//        foutC.precision(0);
+//        foutC << header.stamp.toSec() * 1e9<< " ";
+//        foutC.precision(5);
+//        foutC << correct_t.x() << " "
+//              << correct_t.y() << " "
+//              << correct_t.z() << " "
+//              << correct_q.w() << " "
+//              << correct_q.x() << " "
+//              << correct_q.y() << " "
+//              << correct_q.z() <<endl;
+//        foutC.close();
 
-        ofstream foutC1("/home/healer/catkin_PLVINS/src/PL-VINS/Trajactory/evo_fast_no_loop.txt", ios::app);
+        ofstream foutC1(VINS_RESULT_PATH, ios::app);
         foutC1.setf(ios::fixed, ios::floatfield);
         foutC1.precision(9);
         foutC1 << header.stamp.toSec() << " ";

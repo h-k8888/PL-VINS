@@ -13,7 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
     camera_model
     message_filters
     )
-Set(OpenCV_DIR "/home/hk/opencv-3.2.0/build") # important find opencv version
+Set(OpenCV_DIR "/home/hk/opencv-3.3.1/build") # important find opencv version
 find_package(OpenCV 3.2 QUIET)
 
 catkin_package()
@@ -37,6 +37,8 @@ add_executable(feature_tracker
     )
 
 target_link_libraries(feature_tracker ${catkin_LIBRARIES} ${OpenCV_LIBS})
+message("OpenCV_include_dir=" ${OpenCV_INCLUDE_DIRS})
+message("OpenCV_LIBS=" ${OpenCV_LIBS})
 
 # line detect and match
 add_executable(LineFeature_tracker    

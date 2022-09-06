@@ -127,7 +127,8 @@ getMeasurements()
 
     while (true)
     {
-        if (imu_buf.empty() || feature_buf.empty() || linefeature_buf.empty())
+//        if (imu_buf.empty() || feature_buf.empty() || linefeature_buf.empty())
+        if (imu_buf.empty() || feature_buf.empty())
             return measurements;
 
         std::cout<<"-------------------------------------\n";
@@ -144,7 +145,8 @@ getMeasurements()
         {
             ROS_WARN("throw img, only should happen at the beginning");
             feature_buf.pop();
-            linefeature_buf.pop();
+            if (!linefeature_buf.empty())
+                linefeature_buf.pop();
             continue;
         }
 
@@ -152,7 +154,9 @@ getMeasurements()
         sensor_msgs::PointCloudConstPtr img_msg = feature_buf.front();//点特征
         feature_buf.pop();
         sensor_msgs::PointCloudConstPtr linefeature_msg = linefeature_buf.front();//线特征
-        linefeature_buf.pop();
+        if (!linefeature_buf.empty()) {
+            linefeature_buf.pop();
+        }
 
         // 遍历两个图像之间所有的imu数据
         std::vector<sensor_msgs::ImuConstPtr> IMUs;
@@ -334,23 +338,27 @@ void process()
             //     ROS_ASSERT(z == 1);
             //     image[feature_id].emplace_back(camera_id, xyz_uv);
             // }
-            map<int, vector<pair<int, Vector4d>>> lines; // 特征线索引feature_id --> (相机id,  起始点xy、终点xy)
-            for (unsigned int i = 0; i < line_msg->points.size(); i++)
+            if (!line_msg)
+                estimator.processImage(image, img_msg->header); ///only points feature
+            else
             {
-                int v = line_msg->channels[0].values[i] + 0.5;
-                //std::cout<< "receive id: " << v / NUM_OF_CAM << "\n";
-                int feature_id = v / NUM_OF_CAM;
-                int camera_id = v % NUM_OF_CAM;        // 被几号相机观测到的，如果是单目，camera_id = 0
-                double x_startpoint = line_msg->points[i].x;
-                double y_startpoint = line_msg->points[i].y;
-                double x_endpoint = line_msg->channels[1].values[i];
-                double y_endpoint = line_msg->channels[2].values[i];
+                map<int, vector<pair<int, Vector4d>>> lines; // 特征线索引feature_id --> (相机id,  起始点xy、终点xy)
+                for (unsigned int i = 0; i < line_msg->points.size(); i++) {
+                    int v = line_msg->channels[0].values[i] + 0.5;
+                    //std::cout<< "receive id: " << v / NUM_OF_CAM << "\n";
+                    int feature_id = v / NUM_OF_CAM;
+                    int camera_id = v % NUM_OF_CAM;        // 被几号相机观测到的，如果是单目，camera_id = 0
+                    double x_startpoint = line_msg->points[i].x;
+                    double y_startpoint = line_msg->points[i].y;
+                    double x_endpoint = line_msg->channels[1].values[i];
+                    double y_endpoint = line_msg->channels[2].values[i];
 //                ROS_ASSERT(z == 1);
-                lines[feature_id].emplace_back(camera_id, Vector4d(x_startpoint, y_startpoint, x_endpoint, y_endpoint));
+                    lines[feature_id].emplace_back(camera_id,
+                                                   Vector4d(x_startpoint, y_startpoint, x_endpoint, y_endpoint));
+                }
+                // estimator.processImage(image,lines, img_msg->header);   // 处理image数据，这时候的image已经是特征点数据，不是原始图像了。
+                estimator.processImage(image2, lines, img_msg->header);   // 处理image数据，这时候的image已经是特征点数据，不是原始图像了。
             }
-            // estimator.processImage(image,lines, img_msg->header);   // 处理image数据，这时候的image已经是特征点数据，不是原始图像了。
-            estimator.processImage(image2,lines, img_msg->header);   // 处理image数据，这时候的image已经是特征点数据，不是原始图像了。
-
             double whole_t = t_s.toc();
             printStatistics(estimator, whole_t);
             std_msgs::Header header = img_msg->header;
