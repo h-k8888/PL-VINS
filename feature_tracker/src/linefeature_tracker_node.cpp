@@ -78,8 +78,8 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
                 //根据内参，从像素坐标反算相机系下归一化平面的坐标
                 auto un_lines = trackerData.undistortedLineEndPoints();
 
-                //auto &cur_lines = trackerData.curframe_->vecLine;
-                auto &ids = trackerData.curframe_->lineID; //线当前帧id --> 全局id
+                //auto &cur_lines = trackerData.curframe_->lines;
+                auto &ids = trackerData.curframe_->line_ID; //线当前帧id --> 全局id
 
                 for (unsigned int j = 0; j < ids.size(); j++)
                 {
@@ -111,7 +111,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
     }
     sum_time += t_r.toc();
     mean_time = sum_time/frame_cnt;
-    // ROS_INFO("whole Line feature tracker processing costs: %f", mean_time);
+     ROS_INFO("whole Line feature tracker processing costs: %f", mean_time);
 }
 
 int main(int argc, char **argv)

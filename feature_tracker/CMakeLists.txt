@@ -40,6 +40,10 @@ target_link_libraries(feature_tracker ${catkin_LIBRARIES} ${OpenCV_LIBS})
 message("OpenCV_include_dir=" ${OpenCV_INCLUDE_DIRS})
 message("OpenCV_LIBS=" ${OpenCV_LIBS})
 
+#### ELSED
+set(ELSED_PATH ${PROJECT_SOURCE_DIR}/src/ELSED )
+include_directories(${ELSED_PATH}/src)
+
 # line detect and match
 add_executable(LineFeature_tracker    
     src/linefeature_tracker_node.cpp
@@ -55,6 +59,10 @@ add_executable(LineFeature_tracker
     src/line_descriptor/src/LSDDetector_custom.cpp
     src/line_descriptor/src/precomp_custom.hpp
     src/line_descriptor/src/types_custom.hpp
+
+        ${ELSED_PATH}/src/EdgeDrawer.cpp
+        ${ELSED_PATH}/src/ELSED.cpp
+        ${ELSED_PATH}/src/FullSegmentInfo.cpp
 )
 # /home/healer/PL-VINS/PLVINS/PL-VINS/feature_tracker
 target_link_libraries(LineFeature_tracker 
