@@ -133,6 +133,10 @@ public:
     }
 
     int endFrame();
+
+    vector<Matrix3d> Rs; // rotation in world frame
+    vector<Vector3d> Ps; // position in world frame
+    vector<Vector3d> pi_c; // plane normal in camera frame
 };
 class FeatureManager
 {

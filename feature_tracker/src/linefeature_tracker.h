@@ -146,7 +146,10 @@ class LineFeatureTracker
     void visualize_line(const Mat &imageMat1, const std::vector<Line>& lines, const string &name, const bool show_NMS_area = false);
     void visualize_line_matches(const Mat &img1, const std::vector<Line>& lines1,
                                 const Mat &img2, const std::vector<Line>& lines2,
-                                const string &name);
+                                const string &name, const bool& show_samples = false);
+    void visualize_lines_consecutive(const Mat &img1, const std::vector<Line>& lines1,
+                                     const Mat &img2, const std::vector<Line>& lines2,
+                                     const string &name, const bool& show_samples = false);
 
     void DrawRotatedRectangle(cv::Mat& image, const cv::Point2f& centerPoint, const cv::Size& rectangleSize,
                               const float& rotationDegrees, const int& val = 144);

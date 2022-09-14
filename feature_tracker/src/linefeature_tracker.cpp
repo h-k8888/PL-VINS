@@ -71,7 +71,7 @@ void LineFeatureTracker::readIntrinsicParameter(const string &calib_file)
 
     m_camera = CameraFactory::instance()->generateCameraFromYamlFile(calib_file);
     K_ = m_camera->initUndistortRectifyMap(undist_map1_,undist_map2_);//获取畸变坐标映射矩阵mapx和mapy
-
+//    std::cout << "*** K_ ***\n" << K_<< std::endl;
 }
 
 //根据内参，从像素坐标反算相机系下归一化平面的坐标
@@ -210,6 +210,48 @@ void LineFeatureTracker::visualize_line(const Mat &imageMat1, const std::vector<
     imshow(name, img1);
     waitKey(1);
 }
+
+void visualize_line_samples_undistort(const Mat &imageMat1, const std::vector<Line>& lines_in, const string &name)
+{
+    //	Mat img_1;
+    cv::Mat img1;
+    if (imageMat1.channels() != 3){
+        cv::cvtColor(imageMat1, img1, cv::COLOR_GRAY2BGR);
+    }
+    else{
+        img1 = imageMat1;
+    }
+
+    //    srand(time(NULL));
+    int lowest = 0, highest = 255;
+    int range = (highest - lowest) + 1;
+    for (int k = 0; k < lines_in.size(); ++k)
+    {
+        Line line1 = lines_in[k];  // trainIdx
+        unsigned int r = lowest + int(rand() % range);
+        unsigned int g = lowest + int(rand() % range);
+        unsigned int b = lowest + int(rand() % range);
+
+        //line
+        cv::Point2f startPoint = line1.start_xy;
+        cv::Point2f endPoint = line1.end_xy;
+        cv::line(img1, startPoint, endPoint, cv::Scalar(r, g, b),2 ,8);
+
+        //sample points
+        for (const Point2f& p : line1.sample_points_undistort)
+            cv::circle(img1, p, 1, cv::Scalar(r, g, b), 5);
+
+        //start mid end point
+        // b g r
+//        cv::circle(img1, startPoint, 2, cv::Scalar(255, 0, 0), 5);
+//        cv::circle(img1, endPoint, 2, cv::Scalar(0, 0, 255), 5);
+//        cv::circle(img1, 0.5 * startPoint + 0.5 * endPoint, 2, cv::Scalar(0, 255, 0), 5);
+    }
+
+    imshow(name, img1);
+    waitKey(1);
+}
+
 
 void LineFeatureTracker::NearbyLineTracking(const vector<Line> forw_lines, const vector<Line> cur_lines,
                                             vector<pair<int, int> > &lineMatches) {
@@ -667,7 +709,11 @@ void LineFeatureTracker::readImage(const cv::Mat &_img)
         markFailSamplePoints(status, point2line_idx);
         ROS_DEBUG("markFailSamplePoints, done");
         checkEndpointsAndUpdateLinesInfo();
-//        visualize_line_samples_undistort(forw_img, lines_predict, "optical before reduce line");
+//        visualize_line_samples_undistort(curframe_->img, curframe_->lines, "curr frame");
+//        visualize_line_samples_undistort(forwframe_->img, lines_predict, "optical before reduce line");
+        visualize_lines_consecutive(curframe_->img, curframe_->lines,
+                               forwframe_->img, lines_predict,
+                               "line predict", true);
 
         //Remove lines with insufficient sampling points
         reduceLine(lines_predict, prev_lineID);
@@ -695,7 +741,7 @@ void LineFeatureTracker::readImage(const cv::Mat &_img)
         ROS_DEBUG("updateTrackingLinesAndID");
         updateTrackingLinesAndID();
 //        TicToc t_vis_line_new;
-        visualize_line(forwframe_->img, forwframe_, "lines forward");
+//        visualize_line(forwframe_->img, forwframe_, "lines forward");
 //        visual_time += t_vis_line_new.toc();
         ROS_DEBUG("updateTrackingLinesAndID, done");
 
@@ -704,7 +750,9 @@ void LineFeatureTracker::readImage(const cv::Mat &_img)
         checkGradient(forwframe_->lines);
 //        reduceLine(lines_predict, prev_lineID);
         ROS_DEBUG("check Sample Gradient: %f ms", t_gr.toc());
-        visualize_line_matches(curframe_->img, curframe_->lines, forwframe_->img, forwframe_->lines, "line matches");
+//        visualize_line_matches(curframe_->img, curframe_->lines,
+//                               forwframe_->img, forwframe_->lines,
+//                               "line matches", true);
 
 //        Line2KeyLine(forwframe_->lines, forwframe_->keylsd);
         curframe_ = forwframe_;
@@ -1135,7 +1183,7 @@ void LineFeatureTracker::checkAndUpdateEndpoints(vector<Line> &lines) {
     for (Line& line : lines)
     {
         //todo 采样点和端点数量, 样本点太少尝试延伸线特征
-        if (line.sample_points_undistort.size() < 3) {
+        if ((line.start_predict_fail || line.end_predict_fail) && line.sample_points_undistort.size() < 3) {
             line.is_valid = Line::few_samples;
             continue;
         }
@@ -1200,15 +1248,15 @@ void LineFeatureTracker::checkAndUpdateEndpoints(vector<Line> &lines) {
 
         if (need_update)
         {
-//            MakeALine(line.start_xy, line.end_xy, line);
+            MakeALine(line.start_xy, line.end_xy, line);
             line.is_valid = Line::valid;
             line.updated_forwframe = false;
 //            ROS_DEBUG("line[%d](new_detect = %d) StartUV(%f, %f)", i, line.new_detect, line.StartUV.x, line.StartUV.y);
 //            ROS_DEBUG("line[%d](new_detect = %d) EndUV(%f, %f)", i,  line.new_detect, line.EndUV.x, line.EndUV.y);
         }
-//        //check new line
-        if (line.length < 30)
-            line.is_valid = Line::too_short;
+////        //check new line
+//        if (line.length < 20)
+//            line.is_valid = Line::too_short;
         ++i;
     }
 }
@@ -1328,8 +1376,8 @@ void LineFeatureTracker::reduceLine(vector<Line> &lines, vector<int> &IDs) {
             forw_pts[2 * j + 1] = forw_pts[2 * i + 1];
             IDs[j++] = IDs[i];
         }
-//        else
-//            ROS_WARN("lose line local: %d, global: %d, valid type = %d", i, IDs[i], lines[i].is_valid);
+        else
+            ROS_WARN("lose line local: %d, global: %d, valid type = %d", i, IDs[i], lines[i].is_valid);
     }
 
     forw_pts.resize(2 * j);
@@ -1343,6 +1391,13 @@ void LineFeatureTracker::fitLinesBySamples(vector<Line> &lines) {
     cv::Vec4f line4f;
     for (Line& line : lines) {
         std::vector<Point2f> points(line.sample_points_undistort.begin(), line.sample_points_undistort.end());
+        if (!line.start_predict_fail)
+            points.emplace_back(line.start_xy);
+        if (!line.end_predict_fail)
+            points.emplace_back(line.end_xy);
+//        if (points.size() < 3) {
+//            continue;
+//        }
         cv::fitLine(points, line4f, CV_DIST_HUBER, 1.0, 0.1, 0.01);
         Point2f dir(line4f[0], line4f[1]);
         Point2f x0y0(line4f[2], line4f[3]);
@@ -1643,6 +1698,8 @@ void LineFeatureTracker::checkGradient(vector<Line> &lines, const int &start_idx
         {
             line.is_valid = Line::bad_gradient_direction;
         }
+        if (pts_good < 3)
+            ROS_WARN("sample points, line global %d, few samples", forwframe_->line_ID[i]);
     }
 }
 
@@ -1772,7 +1829,7 @@ void LineFeatureTracker::DrawRotatedRectangle(Mat &image, const Point2f &centerP
 
 void LineFeatureTracker::visualize_line_matches(const Mat &img1, const std::vector<Line>& lines1,
                                                  const Mat &img2, const std::vector<Line>& lines2,
-                                                 const string &name)
+                                                 const string &name, const bool& show_samples)
 {
     Size size( img1.cols + img2.cols, MAX(img1.rows, img2.rows) );
     Mat outImg;
@@ -1810,6 +1867,8 @@ void LineFeatureTracker::visualize_line_matches(const Mat &img1, const std::vect
     //    srand(time(NULL));
     int lowest = 0, highest = 255;
     int range = (highest - lowest) + 1;
+    int circlr_radius = 1;
+    int circlr_thickness = 5;
 
     Mat _outImg1 = outImg( Rect(0, 0, img1.cols, img1.rows) );
     Mat _outImg2 = outImg( Rect(img1.cols, 0, img2.cols, img2.rows) );
@@ -1823,6 +1882,9 @@ void LineFeatureTracker::visualize_line_matches(const Mat &img1, const std::vect
             const int& line_local_id = m.second[0];
             const Line& l = curframe_->lines[line_local_id];
             cv::line(_outImg1, l.start_xy, l.end_xy, cv::Scalar(r, g, b),2 ,8);
+            if (show_samples)
+                for (const Point2f& p : l.sample_points_undistort)
+                    cv::circle(_outImg1, p, circlr_radius, cv::Scalar(r, g, b), circlr_thickness);
         }
         else if (m.second.size() == 2)
         {
@@ -1830,11 +1892,17 @@ void LineFeatureTracker::visualize_line_matches(const Mat &img1, const std::vect
             const int& line_local_id1 = m.second[0];
             const Line& l1 = curframe_->lines[line_local_id1];
             cv::line(_outImg1, l1.start_xy, l1.end_xy, cv::Scalar(r, g, b),2 ,8);
+            if (show_samples)
+                for (const Point2f& p : l1.sample_points_undistort)
+                    cv::circle(_outImg1, p, circlr_radius, cv::Scalar(r, g, b), circlr_thickness);
 
             //line in forwframe
             const int& line_local_id2 = m.second[1];
             const Line& l2 = forwframe_->lines[line_local_id2];
             cv::line(_outImg2, l2.start_xy, l2.end_xy, cv::Scalar(r, g, b),2 ,8);
+            if (show_samples)
+                for (const Point2f& p : l2.sample_points_undistort)
+                    cv::circle(_outImg2, p, circlr_radius, cv::Scalar(r, g, b), circlr_thickness);
         }
         else
             ROS_WARN("one global id for 3 more lines");
@@ -1848,8 +1916,64 @@ void LineFeatureTracker::visualize_line_matches(const Mat &img1, const std::vect
         const int& line_local_id2 = new_lines_local[i];
         const Line& l2 = forwframe_->lines[line_local_id2];
         cv::line(_outImg2, l2.start_xy, l2.end_xy, cv::Scalar(r, g, b),2 ,8);
+        if (show_samples)
+            for (const Point2f& p : l2.sample_points_undistort)
+                cv::circle(_outImg2, p, circlr_radius, cv::Scalar(r, g, b), circlr_thickness);
     }
 
     imshow(name, outImg);
-    waitKey(1);
+    waitKey(10);
+}
+
+
+void LineFeatureTracker::visualize_lines_consecutive(const Mat &img1, const std::vector<Line>& lines1,
+                                                const Mat &img2, const std::vector<Line>& lines2,
+                                                const string &name, const bool& show_samples)
+{
+    Size size( img1.cols + img2.cols, MAX(img1.rows, img2.rows) );
+    Mat outImg;
+    outImg.create( size, CV_MAKETYPE(img1.depth(), 3) );
+    outImg = Scalar::all(0);
+    Mat outImg1, outImg2;
+    outImg1 = outImg( Rect(0, 0, img1.cols, img1.rows) );
+    outImg2 = outImg( Rect(img1.cols, 0, img2.cols, img2.rows) );
+
+    if( img1.type() == CV_8U )
+        cvtColor( img1, outImg1, CV_GRAY2BGR );
+    else
+        img1.copyTo( outImg1 );
+
+    if( img2.type() == CV_8U )
+        cvtColor( img2, outImg2, CV_GRAY2BGR );
+    else
+        img2.copyTo( outImg2 );
+
+    int lowest = 0, highest = 255;
+    int range = (highest - lowest) + 1;
+    int circlr_radius = 1;
+    int circlr_thickness = 5;
+
+    Mat _outImg1 = outImg( Rect(0, 0, img1.cols, img1.rows) );
+    Mat _outImg2 = outImg( Rect(img1.cols, 0, img2.cols, img2.rows) );
+    for (int i = 0; i < lines1.size(); ++i) {
+        unsigned int r = lowest + int(rand() % range);
+        unsigned int g = lowest + int(rand() % range);
+        unsigned int b = lowest + int(rand() % range);
+
+        const Line& l1 = lines1[i];
+        cv::line(_outImg1, l1.start_xy, l1.end_xy, cv::Scalar(r, g, b),2 ,8);
+        if (show_samples)
+            for (const Point2f& p : l1.sample_points_undistort)
+                cv::circle(_outImg1, p, circlr_radius, cv::Scalar(r, g, b), circlr_thickness);
+
+        //line in forwframe
+        const Line& l2 = lines2[i];
+        cv::line(_outImg2, l2.start_xy, l2.end_xy, cv::Scalar(r, g, b),2 ,8);
+        if (show_samples)
+            for (const Point2f& p : l2.sample_points_undistort)
+                cv::circle(_outImg2, p, circlr_radius, cv::Scalar(r, g, b), circlr_thickness);
+    }
+
+    imshow(name, outImg);
+    waitKey(10);
 }
